@@ -50,7 +50,7 @@ def callback():
     return 'OK'
 
 # ==========================================
-# 4. 機器人「大腦」處理邏輯 (精準對位 D~G 與 I~L)
+# 4. 機器人「大腦」處理邏輯 (智慧解析+自動分類)
 # ==========================================
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
@@ -61,35 +61,35 @@ def handle_message(event):
         return
 
     try:
-        # --- 步驟 A：智慧解析你說的話 ---
-        parts = msg.split()
-        record_type = "支出" # 預設是支出
-        amount = 0
+        # --- 步驟 A：智慧解析你說的話 (全新進化版) ---
+        # 1. 判斷收支 (只要有提到"收入"就是收入，否則預設為支出)
+        record_type = "收入" if "收入" in msg else "支出"
+        
+        # 2. 抓出金額 (自動把文字裡的數字挑出來)
+        amount_match = re.search(r'\d+', msg)
+        if not amount_match:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 找不到金額耶！請輸入像這樣：\n午餐 120"))
+            return
+        amount = int(amount_match.group())
+        
+        # 3. 抓出類別與備註 (把數字、收入、支出等字眼清掉，剩下的就是類別)
+        clean_text = re.sub(r'\d+|收入|支出|\$|元', '', msg).strip()
+        parts = clean_text.split()
+        
         category = "未分類"
         note = ""
         
-        if "收入" in parts[0]:
-            record_type = "收入"
-            parts.pop(0)
-        elif "支出" in parts[0]:
-            record_type = "支出"
-            parts.pop(0)
-            
-        for p in parts:
-            num_str = re.sub(r'[^\d]', '', p) 
-            if num_str.isdigit():
-                amount = int(num_str)
-                parts.remove(p)
-                break
-                
         if len(parts) > 0:
             category = parts[0]
         if len(parts) > 1:
             note = " ".join(parts[1:])
             
-        if amount == 0:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 記帳格式錯囉！請輸入像這樣：\n午餐 120\n收入 5000 薪水"))
-            return
+        # 🌟 4. 關鍵字自動分類小秘書
+        meal_keywords = ['早餐', '午餐', '晚餐', '早午餐', '宵夜', '便當']
+        if category in meal_keywords:
+            # 把原本的「午餐」字眼保留到備註去，主類別改為「餐費」
+            note = category + (" " + note if note else "") 
+            category = "餐費"
 
         # --- 步驟 B：連線到 Google Sheet ---
         sheet = get_gsheet()
@@ -105,21 +105,15 @@ def handle_message(event):
 
         # --- 步驟 C：精準判斷並寫入對應的欄位 ---
         if record_type == "收入":
-            # 抓取左邊 D 欄 (第 4 欄：日期) 的最後一行
             col_d = worksheet.col_values(4)
             next_row = len([x for x in col_d if x.strip()]) + 1
-            if next_row < 3: next_row = 3 # 保留前兩行給標題
-            
-            # 寫入 D ~ G 欄
+            if next_row < 3: next_row = 3 
             worksheet.update(range_name=f"D{next_row}:G{next_row}", values=[[date_str, amount, category, note]])
             
         elif record_type == "支出":
-            # 抓取右邊 I 欄 (第 9 欄：日期) 的最後一行
             col_i = worksheet.col_values(9)
             next_row = len([x for x in col_i if x.strip()]) + 1
             if next_row < 3: next_row = 3 
-            
-            # 寫入 I ~ L 欄
             worksheet.update(range_name=f"I{next_row}:L{next_row}", values=[[date_str, amount, category, note]])
             
         # --- 步驟 D：回傳成功通知給你 ---
