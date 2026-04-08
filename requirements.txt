@@ -2,3 +2,5 @@ Flask
 line-bot-sdk
 gspread
 oauth2client
+google-generativeai
+Pillow
