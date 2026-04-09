@@ -27,7 +27,7 @@ handler = WebhookHandler(LINE_CHANNEL_SECRET)
 # 設定 Gemini AI
 genai.configure(api_key=GEMINI_API_KEY)
 # 使用推薦的 gemini-1.5-flash 模型處理多模態任務
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 SHEET_ID = '1zMpiq3L55D4YjKyoRJVvIz_2nQPKkchM6lhLg6JOOdU'
 
